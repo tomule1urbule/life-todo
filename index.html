@@ -419,6 +419,11 @@ else if(/android/i.test(navigator.userAgent)) setTimeout(() => { if(!deferredPro
 
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 
+window.addEventListener("hashchange", () => {
+  const m = location.hash.match(/^#k=([\w-]+)/);
+  if(m){ KEY = m[1]; LS.set("lt_key", KEY); history.replaceState(null, "", location.pathname); $("#keyScrim").classList.remove("show"); sync(); }
+});
+
 /* ---------- start ---------- */
 (function start(){
   const m = location.hash.match(/^#k=([\w-]+)/);
