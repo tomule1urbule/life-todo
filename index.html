@@ -80,6 +80,28 @@
   .btn.danger{background:var(--red-soft);color:var(--red);flex:0 0 auto;padding:12px 16px}
   .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:10px;font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
   .toast.show{opacity:1}
+  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px;margin:8px 0 2px}
+  .seg button{flex:1;border:0;background:none;color:var(--muted);font:600 13.5px Inter,sans-serif;padding:8px;border-radius:9px;cursor:pointer}
+  .seg button.on{background:var(--ink);color:var(--bg)}
+  .cal{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 10px 10px;margin-top:14px}
+  .calhead{display:flex;align-items:center;gap:6px;margin:0 4px 10px}
+  .calhead h2{flex:1;margin:0;font:650 19px Fraunces,Georgia,serif;text-transform:none;letter-spacing:0;color:var(--ink)}
+  .calhead button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:9px;min-width:34px;height:32px;font:600 14px Inter,sans-serif;cursor:pointer;padding:0 9px}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .dow{font:600 11px Inter,sans-serif;color:var(--muted);text-align:center;padding:2px 0 6px;text-transform:uppercase;letter-spacing:.05em}
+  .day{aspect-ratio:1/1.05;border:0;background:none;color:var(--ink);border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:5px 0 0;font:500 14px Inter,sans-serif;position:relative}
+  .day.out{color:var(--muted);opacity:.45}
+  .day.today .num{background:var(--accent);color:var(--bg);border-radius:50%}
+  .day .num{width:26px;height:26px;display:grid;place-items:center}
+  .day.sel{background:var(--accent-soft)}
+  .day.wknd:not(.today) .num{color:var(--muted)}
+  .dots{display:flex;gap:3px;margin-top:3px;height:6px}
+  .dots i{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .dots i.r{background:var(--red)} .dots i.a{background:var(--amber)} .dots i.g{background:var(--line)} .dots i.rep{background:none;border:1.5px solid var(--accent);width:6px;height:6px;box-sizing:border-box}
+  .more{font-size:9.5px;color:var(--muted);line-height:1;margin-top:2px}
+  .dayhead{display:flex;justify-content:space-between;align-items:center}
+  .addday{background:none;border:0;color:var(--accent);font:600 13px Inter,sans-serif;cursor:pointer;text-transform:none;letter-spacing:0}
+  .ghost-task{opacity:.7}
   footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
   header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
   .sync{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:99px;padding:6px 11px;font:500 12.5px Inter,sans-serif;cursor:pointer;white-space:nowrap;margin-top:6px}
@@ -113,8 +135,9 @@
   <div class="chips" id="chips"></div>
   <input class="search" id="search" placeholder="Search tasks…" autocomplete="off">
 
+  <div class="seg" id="seg"><button data-view="list">List</button><button data-view="cal">Calendar</button></div>
   <div id="sections"></div>
-  <footer>Daily reminders arrive for anything overdue or due within 3 days.</footer>
+  <footer>Daily reminders arrive for anything overdue or due within 3 days.<br>Calendar: ● due · ○ repeating · tap a day to add.</footer>
 </div>
 
 <button class="fab" id="fab" aria-label="Add task">+</button>
@@ -234,6 +257,9 @@ function render(){
     (filterCat==="All" || t.category===filterCat) &&
     (!q || (t.title+" "+(t.notes||"")+" "+(t.category||"")).toLowerCase().includes(q)));
 
+  document.querySelectorAll("#seg button").forEach(b => b.classList.toggle("on", b.dataset.view===view));
+  if(view==="cal"){ $("#sections").innerHTML = calHTML(visible); return; }
+
   const groups = [
     ["overdue","Overdue"],["soon","Due in the next 3 days"],["upcoming","Upcoming"],["nodate","Someday"],["done","Done"]
   ];
@@ -271,27 +297,107 @@ function taskHTML(t){
     </div></div>`;
 }
 
+/* ---------- calendar ---------- */
+let view = (()=>{ try{ return localStorage.getItem("lt_view")||"list"; }catch(e){ return "list"; } })();
+let calMonth = todayISO().slice(0,7);  // "YYYY-MM"
+let selDay = todayISO();
+const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+function occurrences(visible, from, to){
+  // map ISO date -> [{t, ghost}] including projected repeats of open recurring tasks
+  const map = {};
+  const push = (d,t,ghost) => { (map[d] ||= []).push({t,ghost}); };
+  for(const t of visible){
+    if(!t.due) continue;
+    if(t.due >= from && t.due <= to) push(t.due, t, false);
+    if(t.repeat && !t.done){
+      let d = t.due, n = 0;
+      while(n++ < 400){ d = stepRepeat(d, t.repeat); if(d > to) break; if(d >= from) push(d, t, true); }
+    }
+  }
+  return map;
+}
+function stepRepeat(s, rep){
+  const d = parse(s);
+  if(rep==="daily") d.setDate(d.getDate()+1);
+  else if(rep==="weekly") d.setDate(d.getDate()+7);
+  else if(rep==="monthly"){ const day=d.getDate(); d.setDate(1); d.setMonth(d.getMonth()+1); d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate())); }
+  else if(rep==="yearly") d.setFullYear(d.getFullYear()+1);
+  else d.setFullYear(d.getFullYear()+100);
+  return iso(d);
+}
+function dotClass(t, d){
+  if(t.done) return "g";
+  if(d < todayISO()) return "r";
+  const n = diffDays(d); return n <= 3 ? "a" : "";
+}
+function calHTML(visible){
+  const [y,m] = calMonth.split("-").map(Number);
+  const first = new Date(y, m-1, 1);
+  const start = new Date(first); start.setDate(1 - ((first.getDay()+6)%7));   // Monday-first
+  const last = new Date(y, m, 0);
+  const end = new Date(last); end.setDate(last.getDate() + (6 - (last.getDay()+6)%7));
+  const occ = occurrences(visible, iso(start), iso(end));
+  const title = first.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  let cells = DOW.map(d => `<div class="dow">${d}</div>`).join("");
+  for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+    const k = iso(d), items = occ[k] || [];
+    const cls = ["day", d.getMonth()!==m-1?"out":"", k===todayISO()?"today":"", k===selDay?"sel":"", (d.getDay()%6===0)?"wknd":""].join(" ");
+    const dots = items.slice(0,3).map(o => `<i class="${o.ghost?"rep":dotClass(o.t,k)}"></i>`).join("");
+    cells += `<button class="${cls}" data-day="${k}" aria-label="${k}${items.length?`, ${items.length} tasks`:""}"><span class="num">${d.getDate()}</span><span class="dots">${dots}</span>${items.length>3?`<span class="more">+${items.length-3}</span>`:""}</button>`;
+  }
+  // selected day panel
+  const dayItems = (occ[selDay] || occurrences(visible, selDay, selDay)[selDay] || []);
+  const open = dayItems.filter(o => !o.t.done || o.ghost), done = dayItems.filter(o => o.t.done && !o.ghost);
+  let overdueHere = "";
+  if(selDay === todayISO()){
+    const od = visible.filter(t => !t.done && t.due && t.due < selDay).sort((a,b)=>a.due.localeCompare(b.due));
+    if(od.length) overdueHere = `<section class="overdue"><h2>Still overdue · ${od.length}</h2><div class="list">${od.map(taskHTML).join("")}</div></section>`;
+  }
+  const label = parse(selDay).toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"});
+  const list = [...open, ...done].map(o => o.ghost
+      ? `<div class="ghost-task">${taskHTML({...o.t, due:selDay}).replace('data-act="toggle"','data-act="edit"')}</div>`
+      : taskHTML(o.t)).join("");
+  return `<div class="cal">
+      <div class="calhead"><button data-cal="-1" aria-label="Previous month">‹</button><h2>${esc(title)}</h2><button data-cal="today">Today</button><button data-cal="1" aria-label="Next month">›</button></div>
+      <div class="grid">${cells}</div>
+    </div>
+    ${overdueHere}
+    <section><h2 class="dayhead"><span>${esc(label)}${dayItems.length?` · ${dayItems.length}`:""}</span><button class="addday" id="addDay">+ Add task</button></h2>
+      <div class="list">${list || `<div class="empty">Nothing planned for this day.</div>`}</div></section>`;
+}
+function shiftMonth(n){
+  const [y,m] = calMonth.split("-").map(Number);
+  const d = new Date(y, m-1+n, 1); calMonth = iso(d).slice(0,7);
+}
+
 /* ---------- events ---------- */
 document.addEventListener("click", e => {
   const chip = e.target.closest(".chip"); if(chip){ filterCat = chip.dataset.cat; render(); return; }
   if(e.target.id==="toggleDone"){ showDone = !showDone; render(); return; }
-  const jump = e.target.closest("[data-jump]"); if(jump){ document.getElementById("sec-"+jump.dataset.jump)?.scrollIntoView({behavior:"smooth"}); return; }
+  const vb = e.target.closest("#seg button"); if(vb){ view = vb.dataset.view; try{ localStorage.setItem("lt_view", view); }catch(_){} render(); return; }
+  const cb = e.target.closest("[data-cal]"); if(cb){ if(cb.dataset.cal==="today"){ calMonth=todayISO().slice(0,7); selDay=todayISO(); } else shiftMonth(+cb.dataset.cal); render(); return; }
+  const db_ = e.target.closest("[data-day]"); if(db_){ selDay = db_.dataset.day; if(selDay.slice(0,7)!==calMonth) calMonth = selDay.slice(0,7); render(); return; }
+  if(e.target.id==="addDay"){ openForm(null, selDay); return; }
+  const jump = e.target.closest("[data-jump]"); if(jump){ if(view!=="list"){ view="list"; render(); } document.getElementById("sec-"+jump.dataset.jump)?.scrollIntoView({behavior:"smooth"}); return; }
   const row = e.target.closest(".task"); if(!row) return;
   const t = tasks.find(x => x.id===row.dataset.id); if(!t) return;
   const act = e.target.closest("[data-act]")?.dataset.act;
   if(act==="toggle") toggleDone(t); else if(act==="edit") openForm(t);
 });
+let tx=null; $("#sections").addEventListener("touchstart", e => { if(view==="cal" && e.target.closest(".grid")) tx = e.touches[0].clientX; }, {passive:true});
+$("#sections").addEventListener("touchend", e => { if(tx==null) return; const dx = e.changedTouches[0].clientX - tx; tx=null; if(Math.abs(dx)>60){ shiftMonth(dx<0?1:-1); render(); } });
 $("#search").addEventListener("input", e => { query = e.target.value; render(); });
-$("#fab").addEventListener("click", () => openForm(null));
+$("#fab").addEventListener("click", () => openForm(null, view==="cal" ? selDay : ""));
 $("#cancelBtn").addEventListener("click", closeForm);
 $("#scrim").addEventListener("click", e => { if(e.target.id==="scrim") closeForm(); });
 $("#quick").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; $("#fDue").value = b.dataset.d==="" ? "" : addDays(todayISO(), +b.dataset.d); });
 
-function openForm(t){
+function openForm(t, presetDue){
   editing = t;
   $("#formTitle").textContent = t ? "Edit task" : "New task";
   $("#fTitle").value = t?.title || "";
-  $("#fDue").value = t?.due || "";
+  $("#fDue").value = t?.due || presetDue || "";
   $("#fPrio").value = t?.priority || "normal";
   $("#fCat").value = t?.category || (filterCat!=="All"?filterCat:"");
   $("#fRep").value = t?.repeat || "";
