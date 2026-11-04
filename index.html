@@ -304,7 +304,7 @@ function closeForm(){ $("#scrim").classList.remove("show"); editing = null; }
 
 
 /* ---------- storage: Google Sheet via Apps Script ---------- */
-const API_URL = "__API_URL__";
+const API_URL = "https://script.google.com/macros/s/AKfycbyrLekwLIoIUrrc-7APNUdirK1Q9-F2rzImloETFAlWyjGzw85D_vXNMxsHkCy1hio/exec";
 const LS = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
