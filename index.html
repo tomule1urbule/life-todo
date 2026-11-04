@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Life To-Do</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2f5d50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="To-Do">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f3ee; --card:#fffdf9; --ink:#1f1d1a; --muted:#7a746b; --line:#e6e0d6;
+    --accent:#2f5d50; --accent-soft:#e3ece8;
+    --red:#b23a2e; --red-soft:#f7e3df; --amber:#a86a12; --amber-soft:#f6ecd8;
+    --radius:14px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#161513;--card:#1f1e1b;--ink:#ede8df;--muted:#9b948a;--line:#33302b;
+      --accent:#7fb8a6;--accent-soft:#22332e;--red:#ef7d6f;--red-soft:#3a2420;--amber:#e0a84e;--amber-soft:#382c17;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:640px;margin:0 auto;padding:22px 16px 110px}
+  header h1{font-family:Fraunces,Georgia,serif;font-weight:650;font-size:30px;margin:0;letter-spacing:-.01em}
+  header .sub{color:var(--muted);margin-top:2px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0 14px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+  .stat b{display:block;font-family:Fraunces,serif;font-size:24px;font-weight:650;line-height:1.1}
+  .stat span{color:var(--muted);font-size:12.5px}
+  .stat.red b{color:var(--red)} .stat.amber b{color:var(--amber)}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px;scrollbar-width:none}
+  .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:5px 12px;font:500 13px Inter,sans-serif;white-space:nowrap;cursor:pointer}
+  .chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .search{width:100%;margin:6px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:inherit}
+  section{margin-top:20px}
+  section h2{font:600 12px Inter,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;display:flex;justify-content:space-between;align-items:center}
+  section.overdue h2{color:var(--red)} section.soon h2{color:var(--amber)}
+  .list{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .task{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-top:1px solid var(--line)}
+  .task:first-child{border-top:0}
+  .check{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--muted);background:none;cursor:pointer;margin-top:1px;display:grid;place-items:center;padding:0}
+  .check.done{background:var(--accent);border-color:var(--accent)}
+  .check.done::after{content:"";width:6px;height:10px;border:solid var(--bg);border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+  .p-high .check{border-color:var(--red)}
+  .body{flex:1;min-width:0;cursor:pointer}
+  .title{font-weight:500;word-wrap:break-word}
+  .is-done .title{text-decoration:line-through;color:var(--muted)}
+  .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;font-size:12.5px;color:var(--muted)}
+  .tag{padding:1px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:500}
+  .due.over{color:var(--red);font-weight:600} .due.soon{color:var(--amber);font-weight:600}
+  .notes{font-size:13px;color:var(--muted);margin-top:3px;white-space:pre-wrap}
+  .empty{padding:18px 14px;color:var(--muted);text-align:center}
+  .toggle{background:none;border:0;color:var(--muted);font:500 12px Inter,sans-serif;cursor:pointer;text-transform:none;letter-spacing:0}
+  .fab{position:fixed;right:max(16px,calc(50% - 304px));bottom:24px;width:58px;height:58px;border-radius:50%;border:0;background:var(--accent);color:var(--bg);font-size:30px;line-height:1;box-shadow:0 6px 20px rgba(0,0,0,.18);cursor:pointer}
+  .banner{background:var(--amber-soft);color:var(--amber);border-radius:12px;padding:10px 12px;margin-top:12px;font-size:13.5px;display:none}
+  .banner.show{display:block}
+  /* sheet */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:flex-end;justify-content:center;z-index:10}
+  .scrim.show{display:flex}
+  .sheet{background:var(--card);width:100%;max-width:640px;border-radius:20px 20px 0 0;padding:18px 16px 24px;max-height:92vh;overflow:auto;animation:up .18s ease-out}
+  @keyframes up{from{transform:translateY(30px);opacity:.4}}
+  .sheet h3{font-family:Fraunces,serif;font-weight:650;font-size:21px;margin:0 0 12px}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px;font-weight:500}
+  input,textarea,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+  textarea{min-height:64px;resize:vertical}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .quick{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+  .quick button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:4px 9px;font:500 12.5px Inter,sans-serif;cursor:pointer}
+  .actions{display:flex;gap:8px;margin-top:18px}
+  .btn{flex:1;padding:12px;border-radius:12px;border:0;font:600 15px Inter,sans-serif;cursor:pointer}
+  .btn.primary{background:var(--accent);color:var(--bg)}
+  .btn.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+  .btn.danger{background:var(--red-soft);color:var(--red);flex:0 0 auto;padding:12px 16px}
+  .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:10px;font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+  .toast.show{opacity:1}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .sync{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:99px;padding:6px 11px;font:500 12.5px Inter,sans-serif;cursor:pointer;white-space:nowrap;margin-top:6px}
+  .sync.err{color:var(--red);border-color:var(--red)}
+  .install{background:var(--accent-soft);color:var(--accent);border-radius:12px;padding:11px 12px;margin-top:12px;font-size:13.5px;display:none;gap:10px;align-items:center}
+  .install.show{display:flex}
+  .install b{font-weight:600}
+  .install .x{margin-left:auto;background:none;border:0;color:inherit;font-size:18px;cursor:pointer;padding:0 4px}
+  .install .go{background:var(--accent);color:var(--bg);border:0;border-radius:8px;padding:6px 10px;font:600 13px Inter,sans-serif;cursor:pointer}
+  @supports(padding:env(safe-area-inset-top)){ .wrap{padding-top:max(22px,env(safe-area-inset-top))} .fab{bottom:max(24px,calc(env(safe-area-inset-bottom) + 12px))} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Life To-Do</h1>
+      <div class="sub" id="today"></div>
+    </div>
+    <button class="sync" id="syncBtn" title="Refresh">↻ Syncing…</button>
+  </header>
+  <div class="banner" id="banner"></div>
+  <div class="install" id="install"><span id="installText"></span><button class="go" id="installGo" hidden>Install</button><button class="x" id="installX" aria-label="Dismiss">×</button></div>
+
+  <div class="stats">
+    <button class="stat red" data-jump="overdue"><b id="nOver">0</b><span>Overdue</span></button>
+    <button class="stat amber" data-jump="soon"><b id="nSoon">0</b><span>Due in 3 days</span></button>
+    <button class="stat" data-jump="upcoming"><b id="nOpen">0</b><span>Open total</span></button>
+  </div>
+
+  <div class="chips" id="chips"></div>
+  <input class="search" id="search" placeholder="Search tasks…" autocomplete="off">
+
+  <div id="sections"></div>
+  <footer>Daily reminders arrive for anything overdue or due within 3 days.</footer>
+</div>
+
+<button class="fab" id="fab" aria-label="Add task">+</button>
+
+<div class="scrim" id="scrim">
+  <form class="sheet" id="form">
+    <h3 id="formTitle">New task</h3>
+    <label for="fTitle">Task</label>
+    <input id="fTitle" required maxlength="200" placeholder="e.g. Renew car insurance">
+    <div class="row">
+      <div>
+        <label for="fDue">Due date</label>
+        <input id="fDue" type="date">
+      </div>
+      <div>
+        <label for="fPrio">Priority</label>
+        <select id="fPrio"><option value="normal">Normal</option><option value="high">High</option><option value="low">Low</option></select>
+      </div>
+    </div>
+    <div class="quick" id="quick">
+      <button type="button" data-d="0">Today</button>
+      <button type="button" data-d="1">Tomorrow</button>
+      <button type="button" data-d="3">In 3 days</button>
+      <button type="button" data-d="7">Next week</button>
+      <button type="button" data-d="30">In a month</button>
+      <button type="button" data-d="">No date</button>
+    </div>
+    <div class="row">
+      <div>
+        <label for="fCat">Category</label>
+        <input id="fCat" list="catList" maxlength="40" placeholder="Home, Admin…">
+        <datalist id="catList"></datalist>
+      </div>
+      <div>
+        <label for="fRep">Repeats</label>
+        <select id="fRep"><option value="">Never</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select>
+      </div>
+    </div>
+    <label for="fNotes">Notes</label>
+    <textarea id="fNotes" maxlength="2000" placeholder="Optional"></textarea>
+    <div class="actions">
+      <button type="button" class="btn danger" id="delBtn" hidden>Delete</button>
+      <button type="button" class="btn ghost" id="cancelBtn">Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="scrim" id="keyScrim">
+  <form class="sheet" id="keyForm">
+    <h3>Connect your list</h3>
+    <p style="color:var(--muted);margin:0 0 6px">Paste your access key once on this device. Your tasks are stored in your own Google Sheet.</p>
+    <label for="keyInput">Access key</label>
+    <input id="keyInput" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+    <div class="actions"><button type="submit" class="btn primary">Connect</button></div>
+  </form>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const DEFAULT_CATS = ["Home","Admin","Family","Health","Car","Finance","Errands"];
+let tasks = [], filterCat = "All", query = "", showDone = false, editing = null;
+
+/* ---------- dates (local) ---------- */
+const pad = n => String(n).padStart(2,"0");
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
+const todayISO = () => iso(new Date());
+const addDays = (s,n) => { const d = parse(s); d.setDate(d.getDate()+n); return iso(d); };
+const diffDays = s => Math.round((parse(s) - parse(todayISO())) / 86400000);
+function nextDue(s, rep){
+  const d = parse(s || todayISO());
+  if(rep==="daily") d.setDate(d.getDate()+1);
+  else if(rep==="weekly") d.setDate(d.getDate()+7);
+  else if(rep==="monthly"){ const day=d.getDate(); d.setDate(1); d.setMonth(d.getMonth()+1); d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate())); }
+  else if(rep==="yearly") d.setFullYear(d.getFullYear()+1);
+  let out = iso(d);
+  while(rep && diffDays(out) < 0) out = nextDue(out, rep); // skip missed cycles
+  return out;
+}
+function dueLabel(s){
+  const n = diffDays(s);
+  if(n < -1) return `${-n} days overdue`;
+  if(n === -1) return "Yesterday";
+  if(n === 0) return "Today";
+  if(n === 1) return "Tomorrow";
+  if(n < 7) return parse(s).toLocaleDateString(undefined,{weekday:"long"});
+  return parse(s).toLocaleDateString(undefined,{day:"numeric",month:"short",year: parse(s).getFullYear()!==new Date().getFullYear()?"numeric":undefined});
+}
+$("#today").textContent = new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"});
+
+/* ---------- render ---------- */
+function bucket(t){
+  if(t.done) return "done";
+  if(!t.due) return "nodate";
+  const n = diffDays(t.due);
+  if(n < 0) return "overdue";
+  if(n <= 3) return "soon";
+  return "upcoming";
+}
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const prioRank = {high:0, normal:1, low:2};
+
+function render(){
+  const open = tasks.filter(t => !t.done);
+  $("#nOver").textContent = open.filter(t => bucket(t)==="overdue").length;
+  $("#nSoon").textContent = open.filter(t => bucket(t)==="soon").length;
+  $("#nOpen").textContent = open.length;
+
+  const cats = [...new Set([...tasks.map(t => t.category).filter(Boolean)])].sort();
+  $("#chips").innerHTML = ["All", ...cats].map(c => `<button class="chip ${c===filterCat?"on":""}" data-cat="${esc(c)}">${esc(c)}</button>`).join("");
+  $("#catList").innerHTML = [...new Set([...DEFAULT_CATS, ...cats])].map(c => `<option value="${esc(c)}">`).join("");
+
+  const q = query.trim().toLowerCase();
+  const visible = tasks.filter(t =>
+    (filterCat==="All" || t.category===filterCat) &&
+    (!q || (t.title+" "+(t.notes||"")+" "+(t.category||"")).toLowerCase().includes(q)));
+
+  const groups = [
+    ["overdue","Overdue"],["soon","Due in the next 3 days"],["upcoming","Upcoming"],["nodate","Someday"],["done","Done"]
+  ];
+  let html = "";
+  for(const [key,label] of groups){
+    let items = visible.filter(t => bucket(t)===key);
+    if(key==="done"){
+      items.sort((a,b) => (b.doneAt||"").localeCompare(a.doneAt||""));
+      if(!items.length) continue;
+      html += `<section class="done"><h2>${label} · ${items.length}<button class="toggle" id="toggleDone">${showDone?"Hide":"Show"}</button></h2>`;
+      if(showDone) html += `<div class="list">${items.slice(0,50).map(taskHTML).join("")}</div>`;
+      html += `</section>`; continue;
+    }
+    items.sort((a,b) => (a.due||"9").localeCompare(b.due||"9") || prioRank[a.priority||"normal"]-prioRank[b.priority||"normal"] || (a.createdAt||"").localeCompare(b.createdAt||""));
+    if(!items.length && (key==="nodate" || key==="upcoming")) continue;
+    html += `<section class="${key}" id="sec-${key}"><h2>${label}${items.length?` · ${items.length}`:""}</h2><div class="list">${
+      items.length ? items.map(taskHTML).join("") : `<div class="empty">${key==="overdue"?"Nothing overdue. Nice.":"Nothing due soon."}</div>`
+    }</div></section>`;
+  }
+  if(!tasks.length) html = `<section><div class="list"><div class="empty">No tasks yet. Tap + to add your first one.</div></div></section>`;
+  $("#sections").innerHTML = html;
+}
+function taskHTML(t){
+  const b = bucket(t);
+  const due = t.due ? `<span class="due ${b==="overdue"?"over":b==="soon"?"soon":""}">${esc(dueLabel(t.due))}</span>` : "";
+  const rep = t.repeat ? `<span>↻ ${esc(t.repeat)}</span>` : "";
+  const prio = t.priority==="high" ? `<span style="color:var(--red)">● High</span>` : t.priority==="low" ? `<span>Low</span>` : "";
+  const cat = t.category ? `<span class="tag">${esc(t.category)}</span>` : "";
+  return `<div class="task ${t.done?"is-done":""} p-${esc(t.priority||"normal")}" data-id="${esc(t.id)}">
+    <button class="check ${t.done?"done":""}" data-act="toggle" aria-label="${t.done?"Mark open":"Mark done"}"></button>
+    <div class="body" data-act="edit">
+      <div class="title">${esc(t.title)}</div>
+      ${(due||rep||prio||cat)?`<div class="meta">${cat}${due}${prio}${rep}</div>`:""}
+      ${t.notes?`<div class="notes">${esc(t.notes.length>140?t.notes.slice(0,140)+"…":t.notes)}</div>`:""}
+    </div></div>`;
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", e => {
+  const chip = e.target.closest(".chip"); if(chip){ filterCat = chip.dataset.cat; render(); return; }
+  if(e.target.id==="toggleDone"){ showDone = !showDone; render(); return; }
+  const jump = e.target.closest("[data-jump]"); if(jump){ document.getElementById("sec-"+jump.dataset.jump)?.scrollIntoView({behavior:"smooth"}); return; }
+  const row = e.target.closest(".task"); if(!row) return;
+  const t = tasks.find(x => x.id===row.dataset.id); if(!t) return;
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if(act==="toggle") toggleDone(t); else if(act==="edit") openForm(t);
+});
+$("#search").addEventListener("input", e => { query = e.target.value; render(); });
+$("#fab").addEventListener("click", () => openForm(null));
+$("#cancelBtn").addEventListener("click", closeForm);
+$("#scrim").addEventListener("click", e => { if(e.target.id==="scrim") closeForm(); });
+$("#quick").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; $("#fDue").value = b.dataset.d==="" ? "" : addDays(todayISO(), +b.dataset.d); });
+
+function openForm(t){
+  editing = t;
+  $("#formTitle").textContent = t ? "Edit task" : "New task";
+  $("#fTitle").value = t?.title || "";
+  $("#fDue").value = t?.due || "";
+  $("#fPrio").value = t?.priority || "normal";
+  $("#fCat").value = t?.category || (filterCat!=="All"?filterCat:"");
+  $("#fRep").value = t?.repeat || "";
+  $("#fNotes").value = t?.notes || "";
+  $("#delBtn").hidden = !t;
+  $("#scrim").classList.add("show");
+  setTimeout(() => $("#fTitle").focus(), 50);
+}
+function closeForm(){ $("#scrim").classList.remove("show"); editing = null; }
+
+
+/* ---------- storage: Google Sheet via Apps Script ---------- */
+const API_URL = "__API_URL__";
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+};
+let KEY = LS.get("lt_key", "");
+let queue = LS.get("lt_queue", []);   // pending writes while offline
+let syncing = false;
+
+function setSync(state){
+  const b = $("#syncBtn");
+  b.classList.toggle("err", state==="err");
+  b.textContent = state==="busy" ? "↻ Syncing…" : state==="err" ? (queue.length ? `● ${queue.length} unsynced` : "● Offline") : "↻ Synced";
+}
+function saveLocal(){ LS.set("lt_tasks", tasks); LS.set("lt_queue", queue); }
+
+async function api(body){
+  let res;
+  if(body) res = await fetch(API_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify({...body, key:KEY})});
+  else res = await fetch(API_URL + "?key=" + encodeURIComponent(KEY) + "&t=" + Date.now());
+  const j = await res.json();
+  if(!j.ok){ const e = new Error(j.error||"error"); e.code = j.error; throw e; }
+  return j.tasks;
+}
+async function sync(){
+  if(syncing || !KEY) return; syncing = true; setSync("busy");
+  try{
+    let fresh = null;
+    while(queue.length){ fresh = await api(queue[0]); queue.shift(); saveLocal(); }
+    fresh = await api(null);
+    tasks = fresh; saveLocal(); render(); setSync("ok"); banner("");
+  }catch(err){
+    if(err.code==="unauthorized"){ KEY=""; LS.set("lt_key",""); askKey("That key didn't work — paste it again."); }
+    setSync("err");
+  }finally{ syncing = false; }
+}
+function enqueue(op){
+  // collapse repeated saves of the same task
+  if(op.action==="save") queue = queue.filter(q => !(q.action==="save" && q.task.id===op.task.id));
+  if(op.action==="delete") queue = queue.filter(q => !(q.action==="save" && q.task.id===op.id));
+  queue.push(op); saveLocal(); render(); sync();
+}
+function putTask(t){
+  const i = tasks.findIndex(x => x.id===t.id);
+  if(i>=0) tasks[i] = t; else tasks.push(t);
+  enqueue({action:"save", task:t});
+}
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+$("#form").addEventListener("submit", e => {
+  e.preventDefault();
+  const title = $("#fTitle").value.trim(); if(!title) return;
+  const repeat = $("#fRep").value;
+  const data = {
+    title, due: $("#fDue").value || (repeat ? todayISO() : ""), priority: $("#fPrio").value,
+    category: $("#fCat").value.trim(), repeat, notes: $("#fNotes").value.trim(),
+  };
+  const was = editing; closeForm();
+  if(was) putTask({...was, ...data, updatedAt:new Date().toISOString()});
+  else putTask({id:newId(), ...data, done:false, createdAt:new Date().toISOString(), doneAt:"", updatedAt:""});
+  toast(was ? "Saved" : "Task added");
+});
+$("#delBtn").addEventListener("click", () => {
+  const t = editing; if(!t) return;
+  if($("#delBtn").dataset.armed!=="1"){ $("#delBtn").dataset.armed="1"; $("#delBtn").textContent="Sure?"; setTimeout(()=>{ $("#delBtn").dataset.armed=""; $("#delBtn").textContent="Delete"; },2500); return; }
+  $("#delBtn").dataset.armed=""; $("#delBtn").textContent="Delete";
+  closeForm();
+  tasks = tasks.filter(x => x.id!==t.id);
+  enqueue({action:"delete", id:t.id});
+  toast("Deleted");
+});
+function toggleDone(t){
+  const now = new Date().toISOString();
+  if(!t.done && t.repeat){
+    const nd = nextDue(t.due, t.repeat);
+    putTask({...t, due:nd, updatedAt:now});
+    toast(`Done · next on ${dueLabel(nd).toLowerCase()}`);
+  } else if(!t.done){
+    putTask({...t, done:true, doneAt:now, updatedAt:now}); toast("Done ✓");
+  } else {
+    putTask({...t, done:false, doneAt:"", updatedAt:now});
+  }
+}
+
+let toastT; function toast(m){ const el=$("#toast"); el.textContent=m; el.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove("show"),2200); }
+function banner(m){ const b=$("#banner"); b.textContent=m||""; b.classList.toggle("show",!!m); }
+
+function askKey(msg){
+  $("#keyScrim").classList.add("show");
+  if(msg) toast(msg);
+  setTimeout(() => $("#keyInput").focus(), 50);
+}
+$("#keyForm").addEventListener("submit", e => {
+  e.preventDefault();
+  KEY = $("#keyInput").value.trim(); LS.set("lt_key", KEY);
+  $("#keyScrim").classList.remove("show"); sync();
+});
+$("#syncBtn").addEventListener("click", sync);
+
+/* ---------- install hint ---------- */
+let deferredPrompt = null;
+const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+function showInstall(html, withBtn){
+  if(standalone || LS.get("lt_noinstall", false)) return;
+  $("#installText").innerHTML = html; $("#installGo").hidden = !withBtn; $("#install").classList.add("show");
+}
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredPrompt = e; showInstall("<b>Install the app</b> on your home screen.", true); });
+$("#installGo").addEventListener("click", async () => { if(!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; $("#install").classList.remove("show"); });
+$("#installX").addEventListener("click", () => { LS.set("lt_noinstall", true); $("#install").classList.remove("show"); });
+if(isIOS) showInstall("<b>Install:</b> tap the <b>Share</b> button, then <b>Add to Home Screen</b>.", false);
+else if(/android/i.test(navigator.userAgent)) setTimeout(() => { if(!deferredPrompt) showInstall("<b>Install:</b> Chrome menu ⋮ → <b>Add to Home screen</b>.", false); }, 4000);
+
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+
+/* ---------- start ---------- */
+(function start(){
+  const m = location.hash.match(/^#k=([\w-]+)/);
+  if(m){ KEY = m[1]; LS.set("lt_key", KEY); history.replaceState(null, "", location.pathname); }
+  tasks = LS.get("lt_tasks", []);
+  render();
+  if(!KEY){ setSync("err"); askKey(); return; }
+  if(!tasks.length) $("#sections").innerHTML = `<section><div class="list"><div class="empty">Loading your tasks…</div></div></section>`;
+  sync();
+  document.addEventListener("visibilitychange", () => { if(document.visibilityState==="visible") sync(); });
+  window.addEventListener("online", sync);
+  let day = todayISO();
+  setInterval(() => { if(todayISO()!==day){ day=todayISO(); $("#today").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"}); render(); } }, 60000);
+})();
+</script>
+</body>
+</html>
